@@ -1,14 +1,11 @@
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 use once_cell;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use crate::common::load_from;
 
 pub fn run_day() {
-    let path = format!("data{}day01.txt", std::path::MAIN_SEPARATOR);
-    let data_file = Path::new(path.as_str());
-    let data = load_data(&data_file);
+    let data = load_from("day01.txt");
     println!("Part 1 answer: {}", day01a(data.as_str()));
     println!("Part 2 answer: {}", day01b(data.as_str()));
 }
@@ -26,10 +23,6 @@ fn day01b(data: &str) -> i32 {
 fn parse_lines(data: Vec<String>) -> i32 {
     let digits = map_string_to_int(data);
     digits.iter().sum::<i32>()
-}
-
-fn load_data(path: &Path) -> String {
-    fs::read_to_string(path).unwrap()
 }
 
 fn split_data_lines(string: &str) -> Vec<String> {

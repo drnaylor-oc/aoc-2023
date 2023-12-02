@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 use structopt::StructOpt;
 
 mod day01;
+mod day02;
+mod common;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "aoc")]
