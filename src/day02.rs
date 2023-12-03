@@ -100,6 +100,7 @@ mod tests {
     use once_cell::sync::Lazy;
     use proptest::collection::{vec as prop_vec};
     use proptest::{prop_assert_eq, prop_compose, proptest};
+    use proptest::strategy::Just;
     use crate::day02::{parse_set, parse_game_index, Set, Game, parse_sets, parse_line, parse_lines, day02a, day02b};
 
     impl Set {
@@ -120,7 +121,7 @@ mod tests {
     }
 
     prop_compose! {
-        fn set_strategy()(red in 0..50u8, green in 0..50u8, blue in 0..50u8) -> Set {
+        fn set_strategy()(red in 0..50u8, green in 0..50u8)(blue in 1u8.checked_sub(red + green).unwrap_or(0u8)..50u8, red in Just(red), green in Just(green)) -> Set {
             Set {
                 red,
                 green,
@@ -149,6 +150,7 @@ mod tests {
         #[test]
         fn test_parse_sets(input in prop_vec(set_strategy(), 1..=5)) {
             let string_to_parse: String = input.iter().map(|x| x.get_string()).collect::<Vec<String>>().join("; ");
+            println!("{}", string_to_parse);
             let mut sets = parse_sets(string_to_parse.as_str());
             let mut sorted_input = input; // taking ownership here as we won't use the original after this
             // sorting is done on the vecs themselves, so return unit.

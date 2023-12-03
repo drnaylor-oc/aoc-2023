@@ -44,16 +44,21 @@ impl Coord {
 
 pub fn run_day() {
     let data = load_from("day03.txt");
+    let (codes, symbol_locations, symbol_coords) = load_data(data.as_str());
+    println!("Part 1: {}", day03a(&codes, &symbol_coords));
+    println!("Part 2: {}", day03b(&codes, &symbol_locations));
+}
+
+fn load_data(input: &str) -> (Vec<Code>, HashSet<Symbol>, HashSet<Coord>) {
     let mut codes: Vec<Code> = Vec::new();
     let mut symbol_locations: HashSet<Symbol> = HashSet::new();
-    for (idx, line) in data.lines().enumerate() {
+    for (idx, line) in input.lines().enumerate() {
         let (line_codes, line_symbols) = read_line(idx, line);
         codes.extend(line_codes);
         symbol_locations.extend(line_symbols);
     }
     let symbol_coords: HashSet<Coord> = get_surrounding_coords_from_symbols(&symbol_locations);
-    println!("Part 1: {}", day03a(&codes, &symbol_coords));
-    println!("Part 2: {}", day03b(&codes, &symbol_locations));
+    (codes, symbol_locations, symbol_coords)
 }
 
 lazy_static! {
@@ -125,7 +130,11 @@ fn read_numbers(line_no: usize, line: &str) -> Vec<Code> {
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
-    use crate::day03::{Code, Coord, read_numbers, read_symbols, Symbol};
+    use proptest::{prop_assert_eq, prop_compose, proptest};
+    use proptest::bool::{ANY as ANY_BOOL};
+    use proptest::strategy::Just;
+    use proptest::collection::{vec as prop_vec};
+    use crate::day03::{Code, Coord, day03a, day03b, load_data, read_numbers, read_symbols, Symbol};
 
     #[test]
     fn test_symbols_none() {
@@ -160,6 +169,51 @@ mod test {
         });
 
         assert_eq!(coords, expected);
+    }
+
+    prop_compose! {
+        fn symbol_strategy(row: u8)(is_gear in ANY_BOOL, col in ..50usize) -> Symbol {
+            Symbol {
+                is_gear,
+                coord: Coord {
+                    row: row as usize,
+                    col
+                }
+            }
+        }
+    }
+
+    // Only the last paramter list will be considered
+    prop_compose! {
+        fn list_of_symbols()(row in ..50u8)
+                            (symbols in prop_vec(symbol_strategy(row), 1..=10), row in Just(row)) -> (u8, HashSet<Symbol>) {
+            let mut s = symbols;
+            // we need to dedup by column, note that the is_gear might be different so we have to do it manually
+            // rather than by just using a set.
+            s.sort_by_key(|x| x.coord.col);
+            s.dedup_by_key(|x1| x1.coord.col);
+            (row, HashSet::from_iter(s))
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_symbols_property(row_and_symbols in list_of_symbols()) {
+            let (row, symbols) = row_and_symbols;
+            let mut sample = ["."; 50];
+            for i in &symbols {
+                sample[i.coord.col] = if i.is_gear {
+                    "*"
+                } else {
+                    "#"
+                };
+            }
+            let result_string = sample.join("");
+            println!("{}", result_string);
+
+            let result = read_symbols(row as usize, result_string.as_str());
+            prop_assert_eq!(symbols, result);
+        }
     }
 
     #[test]
@@ -224,6 +278,29 @@ mod test {
             Code { code: 45, positions: vec![Coord { row: 0, col: 14 }, Coord { row: 0, col: 15 }] },
         ];
         assert_eq!(read_numbers(0, line), expected);
+    }
+
+    const INPUT_EXAMPLE: &str = "467..114..\n\
+                                ...*......\n\
+                                ..35..633.\n\
+                                ......#...\n\
+                                617*......\n\
+                                .....+.58.\n\
+                                ..592.....\n\
+                                ......755.\n\
+                                ...$.*....\n\
+                                .664.598..";
+
+    #[test]
+    fn test_day03a() {
+        let (codes, _, symbol_coords) = load_data(INPUT_EXAMPLE);
+        assert_eq!(day03a(&codes, &symbol_coords), 4361);
+    }
+
+    #[test]
+    fn test_day03b() {
+        let (codes, symbol_locations, _) = load_data(INPUT_EXAMPLE);
+        assert_eq!(day03b(&codes, &symbol_locations), 467835);
     }
 
 }
