@@ -4,6 +4,7 @@ use structopt::StructOpt;
 mod day01;
 mod day02;
 mod common;
+mod day03;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "aoc")]
@@ -20,7 +21,8 @@ fn main() {
     // Add day numbers to functions here
     let days: BTreeMap<u8, Box<dyn Fn() -> ()>> = BTreeMap::from([
         (1, Box::new(day01::run_day) as Box<_>),
-        (2, Box::new(day02::run_day) as Box<_>)
+        (2, Box::new(day02::run_day) as Box<_>),
+        (3, Box::new(day03::run_day) as Box<_>)
     ]);
     let no_of_days: u8 = days.len().try_into().unwrap();
 
