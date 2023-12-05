@@ -5,8 +5,8 @@ use crate::common::load_from;
 pub fn run_day() {
     let data = load_from("day05.txt");
     let parsed_data: ParsedData = parse_lines(data.as_str());
-    println!("{}", day05a(&parsed_data));
-    println!("{}", day05b(&parsed_data));
+    println!("Part 1: {}", day05a(&parsed_data));
+    println!("Part 2: {}", day05b(&parsed_data));
 }
 
 fn parse_lines(str: &str) -> ParsedData {
@@ -43,15 +43,14 @@ fn parse_lines(str: &str) -> ParsedData {
     }
 }
 
-fn walk_data(seed: &u64, parsed_data: &ParsedData) -> u64 {
+fn walk_data(seed: u64, parsed_data: &ParsedData) -> u64 {
     let soil = get_mapping(&seed, &parsed_data.seed_to_soil);
     let fertilizer = get_mapping(&soil, &parsed_data.soil_to_fertilizer);
     let water = get_mapping(&fertilizer, &parsed_data.fertilizer_to_water);
     let light  = get_mapping(&water, &parsed_data.water_to_light);
     let temperature = get_mapping(&light, &parsed_data.light_to_temperature);
     let humidity = get_mapping(&temperature, &parsed_data.temperature_to_humidity);
-    let location = get_mapping(&humidity, &parsed_data.humidity_to_location);
-    location
+    get_mapping(&humidity, &parsed_data.humidity_to_location)
 }
 
 fn get_mapping(value: &u64, mappings: &Vec<Mapping>) -> u64 {
@@ -63,12 +62,42 @@ fn get_mapping(value: &u64, mappings: &Vec<Mapping>) -> u64 {
     value.clone()
 }
 
+fn seed_pairs(seeds: &Vec<u64>) -> Vec<Range<u64>> {
+    let steps = seeds[1..].iter().step_by(2);
+    seeds.iter().step_by(2).zip(steps).map(|(first, second)| {
+        first.clone()..(first.clone()+second.clone())
+    }).collect()
+}
+
 fn day05a(parsed_data: &ParsedData) -> u64 {
-    parsed_data.seeds.iter().map(|seed| walk_data(seed, parsed_data)).min().unwrap()
+    parsed_data.seeds.iter().map(|x| walk_data(x.clone(), parsed_data)).min().unwrap()
 }
 
 fn day05b(parsed_data: &ParsedData) -> u64 {
-    0
+    let seeds = seed_pairs(&parsed_data.seeds);
+    walk_backwards(&seeds, parsed_data)
+}
+
+fn walk_backwards(seeds: &Vec<Range<u64>>, parsed_data: &ParsedData) -> u64 {
+    let reverse_mappings = parsed_data.reverse();
+
+    for i in 0..u64::MAX {
+        let seed = walk_backwards_with_data(&i, &reverse_mappings);
+        if seeds.iter().any(|x| x.contains(&seed)) {
+            return i
+        }
+    }
+    panic!("Couldn't find a thing")
+}
+
+fn walk_backwards_with_data(location: &u64, parsed_data: &ReverseParsedData) -> u64 {
+    let humidity = get_mapping(location, &parsed_data.location_to_humidity);
+    let temperature = get_mapping(&humidity, &parsed_data.humidity_to_temperature);
+    let light = get_mapping(&temperature, &parsed_data.temperature_to_light);
+    let water = get_mapping(&light, &parsed_data.light_to_water);
+    let fertilizer  = get_mapping(&water, &parsed_data.water_to_fertilizer);
+    let soil = get_mapping(&fertilizer, &parsed_data.fertilizer_to_soil);
+    get_mapping(&soil, &parsed_data.soil_to_seed)
 }
 
 #[derive(PartialEq, Debug)]
@@ -83,6 +112,42 @@ struct ParsedData {
     humidity_to_location: Vec<Mapping>
 }
 
+impl ParsedData {
+
+    fn reverse(&self) -> ReverseParsedData {
+        fn generate_mappings(forward_mappings: &Vec<Mapping>) -> Vec<Mapping> {
+            let mut reverse_mappings: Vec<Mapping> = Vec::new();
+            for mapping in forward_mappings {
+                reverse_mappings.push(mapping.reverse_mapping());
+            }
+            reverse_mappings.sort_by_key(|x| x.initial_range.start);
+            reverse_mappings
+        }
+
+        ReverseParsedData {
+            location_to_humidity: generate_mappings(&self.humidity_to_location),
+            humidity_to_temperature: generate_mappings(&self.temperature_to_humidity),
+            temperature_to_light: generate_mappings(&self.light_to_temperature),
+            light_to_water: generate_mappings(&self.water_to_light),
+            water_to_fertilizer: generate_mappings(&self.fertilizer_to_water),
+            fertilizer_to_soil: generate_mappings(&self.soil_to_fertilizer),
+            soil_to_seed: generate_mappings(&self.seed_to_soil)
+        }
+    }
+
+}
+
+#[derive(PartialEq, Debug)]
+struct ReverseParsedData {
+    location_to_humidity: Vec<Mapping>,
+    humidity_to_temperature: Vec<Mapping>,
+    temperature_to_light: Vec<Mapping>,
+    light_to_water: Vec<Mapping>,
+    water_to_fertilizer: Vec<Mapping>,
+    fertilizer_to_soil: Vec<Mapping>,
+    soil_to_seed: Vec<Mapping>
+}
+
 #[derive(PartialEq, Debug)]
 struct Mapping {
     initial_range: Range<u64>,
@@ -93,6 +158,13 @@ impl Mapping {
     fn map_if_valid(&self, initial: &u64) -> Option<u64> {
         self.initial_range.contains(initial).then(|| self.final_start + (initial - self.initial_range.start))
     }
+
+    fn reverse_mapping(&self) -> Mapping {
+        Mapping {
+            initial_range: self.final_start..self.final_start+(self.initial_range.end-self.initial_range.start),
+            final_start: self.initial_range.start
+        }
+    }
 }
 
 #[cfg(test)]
@@ -100,7 +172,7 @@ mod test {
     use std::ops::Deref;
     use once_cell::sync::Lazy;
     use rstest::rstest;
-    use crate::day05::{day05a, get_mapping, Mapping, parse_lines, ParsedData, walk_data};
+    use crate::day05::{day05a, day05b, get_mapping, Mapping, parse_lines, ParsedData, walk_data};
 
     const TEST_DATA: &str = "seeds: 79 14 55 13\n\
                             \n\
@@ -180,6 +252,13 @@ mod test {
     }
 
     #[test]
+    fn test_day05b() {
+        let data = parse_lines(TEST_DATA);
+        assert_eq!(46, day05b(&data));
+    }
+
+
+    #[test]
     fn test_parse_lines() {
         assert_eq!(parse_lines(TEST_DATA), *PARSED_DATA.deref());
     }
@@ -236,7 +315,20 @@ mod test {
     #[case(55, 86)]
     #[case(13, 35)]
     fn test_walk_data(#[case] seed: u64, #[case] expected: u64) {
-        assert_eq!(walk_data(&seed, PARSED_DATA.deref()), expected);
+        assert_eq!(walk_data(seed, PARSED_DATA.deref()), expected);
+    }
+
+    #[test]
+    fn test_reverse_mapping() {
+        let mapping = Mapping {
+            initial_range: 5..10, // 5, 6, 7, 8, 9
+            final_start: 10
+        };
+        let expected = Mapping {
+            initial_range: 10..15,
+            final_start: 5
+        };
+        assert_eq!(mapping.reverse_mapping(), expected);
     }
 
 }

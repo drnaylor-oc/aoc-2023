@@ -26,6 +26,7 @@ version = "0.1.0"
 dependencies = [
  "once_cell",
  "proptest",
+ "rangetools",
  "regex",
  "rstest",
  "structopt",
@@ -418,6 +419,12 @@ checksum = "d25bf25ec5ae4a3f1b92f929810509a2f53d7dca2f50b794ff57e3face536c8f"
 dependencies = [
  "rand_core",
 ]
+
+[[package]]
+name = "rangetools"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6e97ca3dbabd81e6033cfe09f0cef37c89f34f2a9223cab7cf99305d46a9633"
 
 [[package]]
 name = "redox_syscall"
