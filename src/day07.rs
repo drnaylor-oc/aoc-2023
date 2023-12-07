@@ -187,8 +187,10 @@ mod tests {
     use std::cmp::Ordering;
     use std::ops::Deref;
     use once_cell::sync::Lazy;
+    use proptest::strategy::Shuffleable;
+    use rand::seq::SliceRandom;
     use rstest::rstest;
-    use crate::day07::{day07a, day07b, Hand, HandType, parse_all_hands, rank_hands};
+    use crate::day07::{Card, day07a, day07b, determine_hand, Hand, HandType, parse_all_hands, rank_hands};
     use crate::day07::Card::*;
 
     const TEST_DATA: &str = "32T3K 765\n\
@@ -300,6 +302,29 @@ mod tests {
             bid: 684
         };
         assert_eq!(left.cmp(&right), Ordering::Less)
+    }
+
+    #[rstest]
+    #[case(Joker, Joker, Joker, Joker, Joker, HandType::FiveOfAKind)]
+    #[case(King, King, King, King, King, HandType::FiveOfAKind)]
+    #[case(King, King, King, King, Joker, HandType::FiveOfAKind)]
+    #[case(King, Queen, King, King, Joker, HandType::FourOfAKind)]
+    #[case(King, Queen, King, Joker, Joker, HandType::FourOfAKind)]
+    #[case(King, Queen, Joker, Joker, Joker, HandType::FourOfAKind)]
+    #[case(King, Queen, Queen, Joker, Joker, HandType::FourOfAKind)]
+    #[case(King, King, Queen, Queen, Joker, HandType::FullHouse)]
+    #[case(King, Queen, Jack, Joker, Joker, HandType::ThreeOfAKind)]
+    #[case(King, Queen, Jack, King, Joker, HandType::ThreeOfAKind)]
+    #[case(King, Queen, Jack, King, King, HandType::ThreeOfAKind)]
+    #[case(King, Queen, Ten, Ten, Joker, HandType::ThreeOfAKind)]
+    #[case(King, King, Ten, Ten, Nine, HandType::TwoPair)] // can't get a two pair with a joker!
+    #[case(King, Queen, Jack, Ten, Joker, HandType::OnePair)]
+    #[case(King, Queen, Jack, Ten, Ten, HandType::OnePair)]
+    #[case(King, Queen, Jack, Ten, Nine, HandType::HighCard)]
+    fn test_hand_types(#[case] first: Card, #[case] second: Card, #[case] third: Card, #[case] fourth: Card, #[case] fifth: Card, #[case] hand_type: HandType) {
+        let mut cards =  vec![first, second, third, fourth, fifth];
+        cards.shuffle(&mut rand::thread_rng());
+        assert_eq!(determine_hand(&cards), hand_type);
     }
 
 }
