@@ -187,7 +187,6 @@ mod tests {
     use std::cmp::Ordering;
     use std::ops::Deref;
     use once_cell::sync::Lazy;
-    use proptest::strategy::Shuffleable;
     use rand::seq::SliceRandom;
     use rstest::rstest;
     use crate::day07::{Card, day07a, day07b, determine_hand, Hand, HandType, parse_all_hands, rank_hands};
