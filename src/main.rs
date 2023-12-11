@@ -11,6 +11,7 @@ mod day06;
 mod day07;
 mod day08;
 mod day09;
+mod day10;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "aoc")]
@@ -26,15 +27,16 @@ fn main() {
 
     // Add day numbers to functions here
     let days: BTreeMap<u8, Box<dyn Fn() -> ()>> = BTreeMap::from([
-        (1, Box::new(day01::run_day) as Box<_>),
-        (2, Box::new(day02::run_day) as Box<_>),
-        (3, Box::new(day03::run_day) as Box<_>),
-        (4, Box::new(day04::run_day) as Box<_>),
-        (5, Box::new(day05::run_day) as Box<_>),
-        (6, Box::new(day06::run_day) as Box<_>),
-        (7, Box::new(day07::run_day) as Box<_>),
-        (8, Box::new(day08::run_day) as Box<_>),
-        (9, Box::new(day09::run_day) as Box<_>),
+        (1,  Box::new(day01::run_day) as Box<_>),
+        (2,  Box::new(day02::run_day) as Box<_>),
+        (3,  Box::new(day03::run_day) as Box<_>),
+        (4,  Box::new(day04::run_day) as Box<_>),
+        (5,  Box::new(day05::run_day) as Box<_>),
+        (6,  Box::new(day06::run_day) as Box<_>),
+        (7,  Box::new(day07::run_day) as Box<_>),
+        (8,  Box::new(day08::run_day) as Box<_>),
+        (9,  Box::new(day09::run_day) as Box<_>),
+        (10, Box::new(day10::run_day) as Box<_>),
     ]);
     let no_of_days: u8 = days.len().try_into().unwrap();
 

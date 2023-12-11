@@ -12,6 +12,7 @@ once_cell = "1.18"
 rangetools = "0.1"
 tailcall = "0.1"
 num = "0.4"
+ndarray = "0.15"
 
 [dev-dependencies]
 rstest = "0.18"
