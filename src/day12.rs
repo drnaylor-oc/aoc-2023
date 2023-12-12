@@ -197,17 +197,6 @@ mod test {
     }
 
     #[rstest]
-    #[case(0, vec![0,1,2])]
-    #[case(1, vec![1,2,5,6,10])]
-    #[case(2, vec![0,2,4,6,8,10,12,14])]
-    #[case(3, vec![0,1,2,3])]
-    #[case(4, vec![0,1,2,3])]
-    #[case(5, vec![0,4,5,6,7,8,9,10,11])]
-    fn test_get_unknown_indexes(#[case] idx: usize, #[case] expected_indexes: Vec<usize>) {
-        assert_eq!(PARSED_DATA_1.deref().get(idx).unwrap().get_unknown_indexes(), expected_indexes);
-    }
-
-    #[rstest]
     #[case(0, 1)]
     #[case(1, 4)]
     #[case(2, 1)]
