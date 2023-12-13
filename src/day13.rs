@@ -10,7 +10,9 @@ pub fn run_day() {
 }
 
 fn day13a(maps: &Vec<GroundMap>) -> u64 {
-    0
+    maps.iter().map(|x| {
+        x.find_reflection().unwrap_or_else(|| x.transpose().find_reflection().unwrap())
+    }).sum()
 }
 
 fn parse_lines(test_data: &str) -> Vec<GroundMap> {
@@ -87,22 +89,36 @@ impl GroundMap {
         let potential_reflections: Vec<usize> = rows_1
             .zip(rows_2)
             .enumerate()
-            .filter(|(idx, (left, right))| {
-                if *left.eq(right) {
+            .filter_map(|(idx, (left, right))| {
+                if left.eq(right) {
                     Some(idx + 1) // +1 means that
                 } else {
                     None
                 }
             })
             .collect();
+
+        // if reflection is between zero and one, we get 1, so we need to do
+        // idx * 2 with a reverse iterator.
+        potential_reflections.iter().filter(|idx| {
+            let half_range = (**idx).min(self.no_of_rows - *idx);
+            (0..half_range).filter(|x| {
+                self.rows.get(*x).ne(&self.rows.get(self.no_of_rows - *x))
+            }).next().is_none()
+        }).next().map(|x| if self.is_transposed {
+            x.clone() as u64
+        } else {
+            (*x as u64) * 100
+        })
     }
 }
 
 #[cfg(test)]
 mod test {
     use std::ops::Deref;
+    use rstest::rstest;
     use structopt::lazy_static::lazy_static;
-    use crate::day13::{GroundMap, parse_lines};
+    use crate::day13::{GroundMap, parse_lines, day13a};
     use crate::day13::Ground::*;
 
     const TEST_DATA: &str = "#.##..##.\n\
@@ -182,6 +198,26 @@ mod test {
     #[test]
     fn test_transpose() {
         assert_eq!(PARSED_DATA.get(0).unwrap().transpose(), *TRANSPOSED_PARSED_DATA_1.deref());
+    }
+
+    #[rstest]
+    #[case(0, false, None)]
+    #[case(1, false, Some(4))]
+    #[case(0, true, Some(5))]
+    #[case(1, true, None)]
+    fn find_reflections(#[case] idx: usize, #[case] transpose: bool, #[case] expected: Option<u64>) {
+        let map = PARSED_DATA.deref().get(idx).unwrap();
+        let sut = if transpose {
+            map.transpose()
+        } else {
+            map.clone()
+        };
+        assert_eq!(sut.find_reflection(), expected);
+    }
+
+    #[test]
+    fn test_day13a() {
+        assert_eq!(day13a(PARSED_DATA.deref()), 405);
     }
 
 }
