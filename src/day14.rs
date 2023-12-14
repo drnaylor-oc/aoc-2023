@@ -64,21 +64,15 @@ impl Dish {
                 Cube => None,
                 Rounded => Some((x.clone(), y.clone()))
             }).sorted().collect();
-            let next_count = if let Some(original_index) = cache.insert(cache_value, count) {
+            if let Some(original_index) = cache.insert(cache_value, count) {
                 // we have a cycle
                 let cycle_length = count - original_index;
                 let left_to_go = (max_count - count) % cycle_length;
-                // clear the cache to avoid problems down the line
-                cache.clear();
-                max_count - left_to_go
-            } else {
-                count + 1
-            };
 
-            if next_count == max_count {
-                cycled
+                // reconstruct what we want (rounded rocks), we don't need the cube ones for our final calculation
+                cache.iter().find(|(_, value)| **value == original_index + left_to_go).unwrap().0.iter().map(|(x, y)| ((x.clone(), y.clone()), RockType::Rounded)).collect()
             } else {
-                cycles(cycled, cols, rows, next_count, max_count, cache)
+                cycles(cycled, cols, rows, count + 1, max_count, cache)
             }
         }
 
