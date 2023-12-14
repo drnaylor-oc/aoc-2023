@@ -15,6 +15,7 @@ mod day10;
 mod day11;
 mod day12;
 mod day13;
+mod day14;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "aoc")]
@@ -43,6 +44,7 @@ fn main() {
         (11, Box::new(day11::run_day) as Box<_>),
         (12, Box::new(day12::run_day) as Box<_>),
         (13, Box::new(day13::run_day) as Box<_>),
+        (14, Box::new(day14::run_day) as Box<_>),
     ]);
     let no_of_days: u8 = days.len().try_into().unwrap();
 
