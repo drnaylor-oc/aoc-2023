@@ -10,18 +10,41 @@ pub fn run_day() {
     let data = load_from("day16.txt");
     let board = create_board(data.as_str());
     println!("Part 1: {}", day16a(&board));
+    println!("Part 2: {}", day16b(&board));
 }
 
 fn day16a(board: &Board) -> usize {
-    let steps = run_steps(board);
+    let steps = run_steps(board, ((0, 0), Right));
     let set: HashSet<(usize, usize)> = steps.iter().map(|((x, y), _)| (x.clone(), y.clone())).collect();
     set.len()
 }
 
-fn run_steps(board: &Board) -> HashSet<Vector> {
+fn day16b(board: &Board) -> usize {
+    let mut max: usize = 0;
+
+    fn get_steps(row: usize, col: usize, direction: Direction, board: &Board) -> usize {
+        let steps = run_steps(board, ((col, row), direction));
+        let set: HashSet<(usize, usize)> = steps.iter().map(|((x, y), _)| (x.clone(), y.clone())).collect();
+        set.len()
+    }
+
+    for row in 0..board.rows {
+        max = max.max(get_steps(row, 0, Right, board));
+        max = max.max(get_steps(row, board.columns - 1, Left, board));
+    }
+
+    for col in 0..board.columns {
+        max = max.max(get_steps(0, col, Down, board));
+        max = max.max(get_steps(board.rows - 1, col, Up, board));
+    }
+
+    max
+}
+
+fn run_steps(board: &Board, init: Vector) -> HashSet<Vector> {
     let mut steps: HashSet<Vector> = HashSet::new();
-    steps.insert(((0, 0), Right));
-    step(vec![((0, 0), Right)], board, &mut steps);
+    steps.insert(init);
+    step(vec![init], board, &mut steps);
     steps
 }
 
@@ -174,7 +197,7 @@ mod test {
     use indoc::indoc;
     use rstest::rstest;
     use structopt::lazy_static::lazy_static;
-    use crate::day16::{Board, create_board, day16a, Direction, Object};
+    use crate::day16::{Board, create_board, day16a, day16b, Direction, Object};
     use crate::day16::Object::*;
     use crate::day16::Direction::*;
 
@@ -252,6 +275,11 @@ mod test {
     #[test]
     fn test_day16a() {
         assert_eq!(day16a(PARSED_INPUT.deref()), 46);
+    }
+
+    #[test]
+    fn test_day16b() {
+        assert_eq!(day16b(PARSED_INPUT.deref()), 51);
     }
 
 }
