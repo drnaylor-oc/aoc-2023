@@ -7,20 +7,30 @@ pub fn run_day() {
     let data = load_from("day17.txt");
     let grid = Grid::from(data.as_str());
     println!("Part 1: {}", day17a(&grid));
+    println!("Part 2: {}", day17b(&grid));
 }
 
 fn day17a(grid: &Grid) -> u32 {
-    dijkstra(grid, vec![Visitor {
+    dijkstra_ish(grid, vec![Visitor {
         location: (0, 0),
         current_heat: 0,
         last_direction: North,
         steps_in_direction: 0
-    }])
+    }], false)
+}
+
+fn day17b(grid: &Grid) -> u32 {
+    dijkstra_ish(grid, vec![Visitor {
+        location: (0, 0),
+        current_heat: 0,
+        last_direction: North,
+        steps_in_direction: 0
+    }], true)
 }
 
 type CacheKey = (usize, usize, Direction, u8);
 
-fn dijkstra(grid: &Grid, initial_visitor: Vec<Visitor>) -> u32 {
+fn dijkstra_ish(grid: &Grid, initial_visitor: Vec<Visitor>, ultra: bool) -> u32 {
     let mut distances: Vec<Vec<u32>> = vec![vec![u32::MAX; grid.no_of_columns]; grid.no_of_rows];
     let _ = std::mem::replace(&mut distances[0][0], 0u32);
     let mut cache: HashMap<(usize, usize, Direction, u8), u32> = HashMap::new();
@@ -28,15 +38,18 @@ fn dijkstra(grid: &Grid, initial_visitor: Vec<Visitor>) -> u32 {
     // our initial walk is from 0, 0
 
     #[tailcall]
-    fn step(grid: &Grid, current: Vec<Visitor>, cache: &mut HashMap<CacheKey, u32>, mins: &mut Vec<Vec<u32>>) {
-//        println!("START STEP: {}", current.len());
+    fn step(grid: &Grid, current: Vec<Visitor>, cache: &mut HashMap<CacheKey, u32>, mins: &mut Vec<Vec<u32>>, ultra: bool) {
         let mut next_vectors: Vec<Visitor> = Vec::new();
         for visitor in current {
             let new_visitors: Vec<Visitor> = DIRECTIONS
                 .iter()
-                .filter(|x| {
-                    visitor.steps_in_direction == 0 || visitor.last_direction.can_go(x, visitor.steps_in_direction)
-                })
+                .filter(|x|
+                    if ultra {
+                        visitor.steps_in_direction == 0 || visitor.last_direction.can_go_ultra(x, visitor.steps_in_direction)
+                    } else {
+                        visitor.steps_in_direction == 0 || visitor.last_direction.can_go(x, visitor.steps_in_direction)
+                    }
+                )
                 .filter_map(|x| grid.visit(&visitor, x))
                 .collect();
 
@@ -56,11 +69,11 @@ fn dijkstra(grid: &Grid, initial_visitor: Vec<Visitor>) -> u32 {
         }
 
         if !next_vectors.is_empty() {
-            step(grid, next_vectors, cache, mins)
+            step(grid, next_vectors, cache, mins, ultra)
         }
     }
 
-    step(grid, initial_visitor, &mut cache, &mut distances);
+    step(grid, initial_visitor, &mut cache, &mut distances, ultra);
     distances.last().unwrap().last().unwrap().clone()
 }
 
@@ -87,6 +100,14 @@ impl Direction {
 
     fn can_go(&self, direction: &Direction, steps_taken: u8) -> bool {
         self.get_backwards() != *direction && (self != direction || steps_taken < 3)
+    }
+
+    fn can_go_ultra(&self, direction: &Direction, steps_taken: u8) -> bool {
+        if steps_taken < 4 {
+            self == direction
+        } else {
+            self.get_backwards() != *direction && (self != direction || steps_taken < 10)
+        }
     }
 }
 
@@ -170,7 +191,7 @@ mod test {
     use std::ops::Deref;
     use rstest::rstest;
     use structopt::lazy_static::lazy_static;
-    use crate::day17::{day17a, Direction, Grid};
+    use crate::day17::{day17a, day17b, Direction, Grid};
     use crate::day17::Direction::*;
 
     const TEST_DATA: &str = "2413432311323\n\
@@ -186,6 +207,12 @@ mod test {
                              1224686865563\n\
                              2546548887735\n\
                              4322674655533";
+
+    const TEST_DATA_2: &str = "111111111111\n\
+                               999999999991\n\
+                               999999999991\n\
+                               999999999991\n\
+                               999999999991";
 
     lazy_static! {
         static ref PARSED_DATA_VEC: Vec<Vec<u32>> = vec![
@@ -273,8 +300,13 @@ mod test {
     }
 
     #[test]
-    fn test_day17a() {
+    fn test_day17b() {
         assert_eq!(day17a(PARSED_DATA.deref()), 102);
+    }
+
+    #[test]
+    fn test_day17b_2() {
+        assert_eq!(day17b(&Grid::from(TEST_DATA_2)), 47); // the example in AoC is wrong, probably deliberately.
     }
 
 }
