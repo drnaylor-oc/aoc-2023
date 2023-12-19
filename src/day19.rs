@@ -1,3 +1,4 @@
+use std::cmp::max;
 use std::collections::HashMap;
 use regex::Regex;
 use tailcall::tailcall;
@@ -10,10 +11,15 @@ pub fn run_day() {
     let data = load_from("day19.txt");
     let (rules, parts) = parse_data(data.as_str());
     println!("Part 1: {}", day19a(&parts, &rules));
+    println!("Part 2: {}", day19b(&rules));
 }
 
 fn day19a(parts: &Vec<Part>, rules: &HashMap<String, Vec<Check>>) -> u64 {
     parts.iter().filter(|part| run_workflow(part, rules, "in")).map(|x| x.sum()).sum()
+}
+
+fn day19b(rules: &HashMap<String, Vec<Check>>) -> u64 {
+    run_ranges(vec![(String::from("in"), PartRange::init())], rules, 0)
 }
 
 #[tailcall]
@@ -48,6 +54,42 @@ fn run_workflow(part: &Part, rules: &HashMap<String, Vec<Check>>, current_rule: 
         false
     }
 
+}
+
+#[tailcall]
+fn run_ranges(part_range: Vec<(String, PartRange)>, rules: &HashMap<String, Vec<Check>>, acc: u64) -> u64 {
+    let mut next_ranges: Vec<(String, PartRange)> = Vec::new();
+    let mut add: u64 = acc;
+    for (next_workflow, range) in part_range {
+        let checks = rules.get(next_workflow.as_str()).unwrap();
+        let mut left = range.clone();
+        for check in checks {
+            let (new_workflow, cont) = left.split(check);
+            if let Some(result) = new_workflow {
+                // send this down the next step
+                match check.result() {
+                    Workflow(flow) => {
+                        next_ranges.push((flow.clone(), result))
+                    },
+                    Accept => add += result.total(),
+                    Reject => ()
+                }
+            }
+
+            if let Some(next) = cont {
+                left = next
+            } else {
+                // nothing more to do!
+                break;
+            }
+        }
+    }
+
+    if next_ranges.is_empty() {
+        add
+    } else {
+        run_ranges(next_ranges, rules, add)
+    }
 }
 
 fn parse_data(data: &str) -> (HashMap<String, Vec<Check>>, Vec<Part>) {
@@ -149,6 +191,14 @@ enum Check {
 }
 
 impl Check {
+    fn result(&self) -> Result {
+        match self {
+            LessThan(_, _, r) => r,
+            GreaterThan(_, _, r) => r,
+            Always(r) => r
+        }.clone()
+    }
+
     fn parse(rule: &str) -> Check {
         if rule.contains(":") {
             let (first, action) = rule.split_once(":").unwrap();
@@ -165,7 +215,7 @@ impl Check {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 enum Result {
     Workflow(String),
     Accept,
@@ -182,6 +232,130 @@ impl Result {
     }
 }
 
+#[derive(PartialEq, Clone, Copy, Debug)]
+struct SimpleRange {
+    min: u64,
+    max: u64
+}
+
+impl SimpleRange {
+    fn init() -> SimpleRange {
+        SimpleRange { min: 1, max: 4000 }
+    }
+
+    fn range(&self) -> u64 {
+        max(0, self.max + 1 - self.min)
+    }
+
+    fn split_less_than(&self, amt: u64) -> (Option<SimpleRange>, Option<SimpleRange>) {
+        if self.min >= amt {
+            (None, Some(self.clone()))
+        } else if self.max < amt {
+            (Some(self.clone()), None)
+        } else {
+            (Some(SimpleRange { min: self.min, max: amt - 1}), Some(SimpleRange { min: amt, max: self.max }))
+        }
+    }
+
+    fn split_greater_than(&self, amt: u64) -> (Option<SimpleRange>, Option<SimpleRange>) {
+        if self.min > amt {
+            (Some(self.clone()), None)
+        } else if self.max <= amt {
+            (None, Some(self.clone()))
+        } else {
+            (Some(SimpleRange { min: amt + 1, max: self.max}), Some(SimpleRange { min: self.min, max: amt }))
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+struct PartRange {
+    x: SimpleRange,
+    m: SimpleRange,
+    a: SimpleRange,
+    s: SimpleRange
+}
+
+impl PartRange {
+
+    fn init() -> PartRange {
+        PartRange {
+            x: SimpleRange::init(),
+            m: SimpleRange::init(),
+            a: SimpleRange::init(),
+            s: SimpleRange::init()
+        }
+    }
+
+    fn total(&self) -> u64 {
+        self.x.range() * self.m.range() * self.s.range() * self.a.range()
+    }
+
+    fn split(&self, check: &Check) -> (Option<PartRange>, Option<PartRange>) {
+        match check {
+            LessThan(X, amt, _) => {
+                let (first, second) = self.x.split_less_than(*amt);
+                (
+                    first.map(|r| PartRange { x: r, m: self.m.clone(), a: self.a.clone(), s: self.s.clone() }),
+                    second.map(|r| PartRange { x: r, m: self.m.clone(), a: self.a.clone(), s: self.s.clone() })
+                )
+            },
+            LessThan(M, amt, _) => {
+                let (first, second) = self.m.split_less_than(*amt);
+                (
+                    first.map(|r| PartRange { x: self.x.clone(), m: r, a: self.a.clone(), s: self.s.clone() }),
+                    second.map(|r| PartRange { x: self.x.clone(), m: r, a: self.a.clone(), s: self.s.clone() })
+                )
+            },
+            LessThan(A, amt, _) => {
+                let (first, second) = self.a.split_less_than(*amt);
+                (
+                    first.map(|r| PartRange { x: self.x.clone(), m: self.m.clone(), a: r, s: self.s.clone() }),
+                    second.map(|r| PartRange { x: self.x.clone(), m: self.m.clone(), a: r, s: self.s.clone() })
+                )
+            },
+            LessThan(S, amt, _) => {
+                let (first, second) = self.s.split_less_than(*amt);
+                (
+                    first.map(|r| PartRange { x: self.x.clone(), m: self.m.clone(), a: self.a.clone(), s: r }),
+                    second.map(|r| PartRange { x: self.x.clone(), m: self.m.clone(), a: self.a.clone(), s: r })
+                )
+            },
+            GreaterThan(X, amt, _) => {
+                let (first, second) = self.x.split_greater_than(*amt);
+                (
+                    first.map(|r| PartRange { x: r, m: self.m.clone(), a: self.a.clone(), s: self.s.clone() }),
+                    second.map(|r| PartRange { x: r, m: self.m.clone(), a: self.a.clone(), s: self.s.clone() })
+                )
+            },
+            GreaterThan(M, amt, _) => {
+                let (first, second) = self.m.split_greater_than(*amt);
+                (
+                    first.map(|r| PartRange { x: self.x.clone(), m: r, a: self.a.clone(), s: self.s.clone() }),
+                    second.map(|r| PartRange { x: self.x.clone(), m: r, a: self.a.clone(), s: self.s.clone() })
+                )
+            },
+            GreaterThan(A, amt, _) => {
+                let (first, second) = self.a.split_greater_than(*amt);
+                (
+                    first.map(|r| PartRange { x: self.x.clone(), m: self.m.clone(), a: r, s: self.s.clone() }),
+                    second.map(|r| PartRange { x: self.x.clone(), m: self.m.clone(), a: r, s: self.s.clone() })
+                )
+            },
+            GreaterThan(S, amt, _) => {
+                let (first, second) = self.s.split_greater_than(*amt);
+                (
+                    first.map(|r| PartRange { x: self.x.clone(), m: self.m.clone(), a: self.a.clone(), s: r }),
+                    second.map(|r| PartRange { x: self.x.clone(), m: self.m.clone(), a: self.a.clone(), s: r })
+                )
+            },
+            Always(_) => (Some(self.clone()), None)
+        }
+    }
+
+}
+
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
@@ -190,7 +364,7 @@ mod test {
     use proptest::proptest;
     use rstest::rstest;
     use structopt::lazy_static::lazy_static;
-    use crate::day19::{Part, Check, parse_data, day19a};
+    use crate::day19::{Part, Check, parse_data, day19a, day19b};
     use crate::day19::Check::*;
     use crate::day19::Category::*;
     use crate::day19::Result::*;
@@ -244,6 +418,11 @@ mod test {
     #[test]
     fn test_day19a() {
         assert_eq!(day19a(PARSED_PARTS.deref(), PARSED_CHECK_SETS.deref()), 19114);
+    }
+
+    #[test]
+    fn test_day19b() {
+        assert_eq!(day19b(PARSED_CHECK_SETS.deref()), 167409079868000);
     }
 
     #[test]
