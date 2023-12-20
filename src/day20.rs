@@ -1,9 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
 use std::ops::Deref;
 use dyn_eq::DynEq;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use num::integer::lcm;
 use regex::Regex;
 use tailcall::tailcall;
 use crate::common::{EMPTY_STRING_VEC, load_from};
@@ -12,13 +13,19 @@ dyn_eq::eq_trait_object!(Module);
 
 pub fn run_day() {
     let data = load_from("day20.txt");
-    let mut modules = parse_modules(data.as_str());
-    println!("Part 1: {}", day20a(&mut modules));
+    let mut part_1_modules = parse_modules(data.as_str());
+    let mut part_2_modules = parse_modules(data.as_str());
+    println!("Part 1: {}", day20a(&mut part_1_modules));
+    println!("Part 2: {}", day20b(&mut part_2_modules));
 }
 
 fn day20a(modules: &mut IndexMap<String, Box<dyn Module>>) -> u64 {
     let (low, high) = cycle(modules, 1000);
     low * high
+}
+
+fn day20b(modules: &mut IndexMap<String, Box<dyn Module>>) -> u64 {
+    find_rx(modules)
 }
 
 fn parse_modules(data: &str) -> IndexMap<String, Box<dyn Module>> {
@@ -61,7 +68,7 @@ fn parse_modules(data: &str) -> IndexMap<String, Box<dyn Module>> {
 
     for output in final_outputs {
         if !modules.contains_key(&output) {
-            modules.insert(output.clone(), Box::new(Output {}));
+            modules.insert(output.clone(), Box::new(Output::new()));
         }
     }
 
@@ -85,6 +92,48 @@ impl Cache {
     }
 }
 
+fn find_rx(modules: &mut IndexMap<String, Box<dyn Module>>) -> u64 {
+
+    // find what feeds into rx -- looking at data it's a Conjunction module.
+    let input = modules.iter()
+        .filter(|(_, module)| module.output().contains(&String::from("rx")))
+        .map(|(name, _)| name.clone())
+        .next().unwrap();
+
+    let mut feed_in: HashSet<String> = modules.get(&input).unwrap().keys_to_watch().iter().map(|x| x.clone()).collect();
+
+    // figure out what happens from the broadcaster
+    let mut loops: Vec<u64> = Vec::new();
+    let output_from_bcast = modules.get("broadcaster").unwrap().output().clone();
+
+    for bcast in output_from_bcast {
+        let mut cache: HashMap<Cache, u64> = HashMap::new();
+        cache.insert(Cache::from(modules), 0);
+        modules.insert(input.clone(), Box::new(Output::new()));
+        let mut counter = 0;
+        'outer: loop {
+            counter += 1;
+            let mut pulses: Vec<(String, Pulse)> = Vec::new();
+            send_pulse(VecDeque::from([(String::from("broadcaster"), bcast.clone(), Pulse::Low)]), modules, &mut pulses);
+            if let Some(x) = cache.insert(Cache::from(modules), counter) {
+                panic!("We got a loop {} -> {}", x, counter);
+            }
+           // println!("{:?}", modules.get("fd").unwrap());
+            let exit = modules.get(&input).unwrap();
+            for i in &feed_in.clone() {
+                if exit.has_high(i) { // they're all inverters, so all need to get Low to send High.
+                    loops.push(counter);
+                    feed_in.remove(i);
+                    break 'outer;
+                }
+            }
+        }
+    }
+
+    loops.iter().map(|x| x.clone()).reduce(|x, y| lcm(x, y)).unwrap()
+}
+
+
 fn cycle(modules: &mut IndexMap<String, Box<dyn Module>>, count: u64) -> (u64, u64) {
     let mut pulses_list: Vec<Vec<Pulse>> = Vec::new();
     let mut counter: u64 = 0;
@@ -94,12 +143,13 @@ fn cycle(modules: &mut IndexMap<String, Box<dyn Module>>, count: u64) -> (u64, u
 
     cache.insert(Cache::from(modules), 0);
     while counter < count {
-        let mut pulses: Vec<Pulse> = Vec::new();
-        send_pulse(vec![(String::from("button"), String::from("broadcaster"), Pulse::Low)], modules, &mut pulses);
-        let low_cycle = pulses.iter().filter(|x| **x == Pulse::Low).count() as u64;
+        let mut pulses: Vec<(String, Pulse)> = Vec::new();
+        send_pulse(VecDeque::from([(String::from("button"), String::from("broadcaster"), Pulse::Low)]), modules, &mut pulses);
+        let actual_pulses = pulses.iter().map(|(_, p)| p.clone()).collect_vec();
+        let low_cycle = actual_pulses.iter().filter(|x| **x == Pulse::Low).count() as u64;
         low += low_cycle;
         high += pulses.len() as u64 - low_cycle;
-        pulses_list.push(pulses);
+        pulses_list.push(actual_pulses);
         if let Some(previous) = cache.insert(Cache::from(modules), counter + 1) {
             // we have a repeat, so we find that range and repeat it.
             let range = counter + 1 - previous;
@@ -129,17 +179,19 @@ fn cycle(modules: &mut IndexMap<String, Box<dyn Module>>, count: u64) -> (u64, u
 }
 
 #[tailcall]
-fn send_pulse(modules_to_run: Vec<(String, String, Pulse)>, modules: &mut IndexMap<String, Box<dyn Module>>, pulses: &mut Vec<Pulse>) {
+fn send_pulse(modules_to_run: VecDeque<(String, String, Pulse)>, modules: &mut IndexMap<String, Box<dyn Module>>, pulses: &mut Vec<(String, Pulse)>) {
+    let mut m = modules_to_run;
 
     fn run_module(module: &mut Box<dyn Module>, incoming_module: &str, pulse: &Pulse) -> Option<(Pulse, Vec<String>)> {
         module.receive(pulse, incoming_module).map(|x| (x, module.output().clone()))
     }
 
-    let mut next: Vec<(String, String, Pulse)> = Vec::new();
-    for (from, module, pulse) in modules_to_run {
-        pulses.push(pulse.clone());
-        if let Some((pulse, next_modules)) = run_module(modules.get_mut(module.as_str()).unwrap(), from.as_str(), &pulse) {
-            next_modules.iter().map(|x| (module.clone(), x.clone(), pulse.clone())).for_each(|x| next.push(x));
+    let mut next: VecDeque<(String, String, Pulse)> = VecDeque::new();
+    while let Some((from, module, pulse)) = m.pop_front() {
+        pulses.push((from.clone(), pulse.clone()));
+        let m = modules.get_mut(module.as_str()).unwrap();
+        if let Some((pulse, next_modules)) = run_module(m, from.as_str(), &pulse) {
+            next_modules.iter().map(|x| (module.clone(), x.clone(), pulse.clone())).for_each(|x| next.push_back(x));
         }
     }
 
@@ -162,6 +214,14 @@ trait Module: DynEq + Debug {
 
     fn state(&self) -> Vec<bool> {
         Vec::new()
+    }
+
+    fn keys_to_watch(&self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn has_high(&self, _: &String) -> bool {
+        false
     }
 }
 
@@ -262,19 +322,38 @@ impl Module for Conjunction {
     fn state(&self) -> Vec<bool> {
         self.high_from.values().map(|x| *x == Pulse::High).collect_vec()
     }
+
+    fn keys_to_watch(&self) -> Vec<String> {
+        self.high_from.keys().map(|x| x.clone()).collect_vec()
+    }
 }
 
 #[derive(PartialEq, Eq, Debug)]
-struct Output {}
+struct Output {
+    last_received: HashSet<String>
+}
+
+impl Output {
+    fn new() -> Output {
+        Output { last_received: HashSet::new() }
+    }
+}
 
 impl Module for Output {
 
-    fn receive(&mut self, _: &Pulse, _: &str) -> Option<Pulse> {
+    fn receive(&mut self, p: &Pulse, input: &str) -> Option<Pulse> {
+        if *p == Pulse::High {
+            self.last_received.insert(String::from(input));
+        }
         None
     }
 
     fn output(&self) -> &Vec<String> {
         EMPTY_STRING_VEC.deref()
+    }
+
+    fn has_high(&self, from: &String) -> bool {
+        self.last_received.contains(from)
     }
 }
 
@@ -316,7 +395,7 @@ mod test {
             (String::from("inv"), Box::new(Conjunction::new(vec![String::from("a")], vec![String::from("b")])) as Box<dyn Module>),
             (String::from("b"), Box::new(FlipFlop::new(vec![String::from("con")])) as Box<dyn Module>),
             (String::from("con"), Box::new(Conjunction::new(vec![String::from("a"), String::from("b")], vec![String::from("output")])) as Box<dyn Module>),
-            (String::from("output"), Box::new(Output{}) as Box<dyn Module>)
+            (String::from("output"), Box::new(Output::new()) as Box<dyn Module>)
         ])
     }
 
@@ -374,5 +453,19 @@ mod test {
         let result = conjunction.receive(&pulse, from);
         assert_eq!(conjunction.high_from, final_state);
         assert_eq!(result, Some(expected));
+    }
+
+    #[rstest]
+    #[case(vec![Pulse::High, Pulse::Low])]
+    #[case(vec![Pulse::High])]
+    #[case(vec![Pulse::Low, Pulse::High])]
+    #[case(vec![Pulse::Low])]
+    fn test_output_module(#[case] expected: Vec<Pulse>) {
+        let mut output = Output::new();
+        assert_eq!(output.has_high(&String::from("")), false);
+        for p in &expected {
+            output.receive(&p, "");
+        }
+        assert_eq!(output.has_high(&String::from("")), expected.contains(&Pulse::High));
     }
 }
