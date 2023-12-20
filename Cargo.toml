@@ -14,6 +14,8 @@ tailcall = "0.1"
 num = "0.4"
 itertools = "0.12"
 indoc = "2"
+dyn-eq = "0.1"
+indexmap = "2.1"
 
 [dev-dependencies]
 rstest = "0.18"
