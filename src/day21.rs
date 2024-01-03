@@ -196,7 +196,7 @@ mod test {
     use std::ops::Deref;
     use indoc::indoc;
     use structopt::lazy_static::lazy_static;
-    use crate::day21::{Coord, Grid, parse_data, walk_from_start, walk_on_infinite};
+    use crate::day21::{Coord, Grid, parse_data, walk_from_start};
 
     const TEST_DATA: &str = indoc! {
         "...........

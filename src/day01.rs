@@ -6,8 +6,8 @@ use crate::common::load_from;
 
 pub fn run_day() {
     let data = load_from("day01.txt");
-    println!("Part 1 answer: {}", day01a(data.as_str()));
-    println!("Part 2 answer: {}", day01b(data.as_str()));
+    println!("Part 1: {}", day01a(data.as_str()));
+    println!("Part 2: {}", day01b(data.as_str()));
 }
 
 fn day01a(data: &str) -> i32 {
