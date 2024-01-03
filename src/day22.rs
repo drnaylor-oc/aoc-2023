@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use itertools::Itertools;
 use crate::common::load_from;
 
@@ -62,43 +62,6 @@ fn run_day22b(bricks: &Vec<Brick>) -> u64 {
         changed += apply_gravity(vec).1;
     }
     changed
-}
-
-// TODO: For later -- use dynamic programming for this.
-// fn run_day22b(bricks: &Vec<Brick>) {
-//     let map: HashMap<&Brick, HashSet<&Brick>> = HashMap::new();
-//     let (min_z_slice, max_z_slice) = gather_slices(bricks);
-//     for brick in bricks.iter().rev() {
-//         let affected = affected_by_disintegration();
-//     }
-// }
-
-fn affected_by_disintegration<'a>(target: &'a Brick, above: Vec<&'a Brick>) -> HashSet<&'a Brick> {
-    above.iter().filter_map(|b| {
-        if target.xy_overlap(*b) {
-            Some(*b)
-        } else {
-            None
-        }
-    }).collect()
-}
-
-#[allow(dead_code)]
-fn can_be_disintergrated<'a>(target: &'a Brick, current_row_bricks: Box<dyn Iterator<Item = &&'a Brick> + '_>, bricks_above: Box<dyn Iterator<Item = &&'a Brick> + '_>) -> bool {
-    // All bricks in the same z level as the target brick, minus the target.
-    let bottom_bricks: Vec<&Brick> = current_row_bricks.filter(|x| **x != target).map(|x| *x).collect_vec();
-    // Bricks that are above target, then checks to see if each brick has another "bottom_brick" that it overlaps with.
-    let bricks_above_that_overlap_target = bricks_above.filter(|top_brick| top_brick.xy_overlap(target)).map(|x| *x).collect_vec(); // only bricks that overlap the target
-
-    // We have each brick that sits on the target. We now need to figure out if any of the bricks have any other overlaps.
-    // If ALL of them do, then we can disintegrate, otherwise, we do not.
-    // Therefore, we filter on if a brick DOES NOT have an overlap -- if any do not, then we return something,
-    // and that means do not disintegrate.
-    bricks_above_that_overlap_target
-        .iter()
-        .filter(|x| bottom_bricks.iter().all(|g| !x.xy_overlap(g))) // if any overlap, that means it's supported. We want any that are not.
-        .next() // blocks that are not supported
-        .is_none() // If we don't get anything, nothing will fall, so disintegrate.
 }
 
 fn gather_slices<'a>(bricks: &'a Vec<Brick>) -> (BTreeMap<u32, Vec<&'a Brick>>, BTreeMap<u32, Vec<&'a Brick>>) {
