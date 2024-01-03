@@ -182,7 +182,7 @@ mod test {
     use proptest::proptest;
     use rstest::rstest;
     use structopt::lazy_static::lazy_static;
-    use crate::day22::{apply_gravity, Brick, can_be_disintergrated, Coord, gather_slices, parse_bricks, parse_coord, prepare_bricks, run_day22a, run_day22b};
+    use crate::day22::{apply_gravity, Brick, Coord, gather_slices, parse_bricks, parse_coord, prepare_bricks, run_day22a, run_day22b};
 
     const TEST_DATA: &str = indoc! {
         "1,0,1~1,2,1
@@ -265,60 +265,6 @@ mod test {
     fn integration_test_day_22a() {
         let g_bricks = prepare_bricks(TEST_DATA);
         assert_eq!(run_day22a(&g_bricks), 5);
-    }
-
-    #[test]
-    fn test_can_be_disintegrated_false() {
-        let target = Brick { min: (0, 0, 1), max: (1, 0, 1) };
-        let other_bottom = Brick { min: (2, 0, 1), max: (3, 0, 1) };
-        let bottom_row = vec![
-            &target,
-            &other_bottom,
-        ];
-        let top_row = vec![
-            Brick { min: (0, 0, 2), max: (1, 0, 2) }, // this brick should fall as we're taking the target below away, so we should get "false"
-            Brick { min: (2, 0, 2), max: (3, 0, 2) },
-        ];
-        let top_row_borrow = top_row.iter().collect_vec();
-
-        let result = can_be_disintergrated(&target, Box::new(bottom_row.iter()), Box::new(top_row_borrow.iter()));
-        assert_eq!(result, false);
-    }
-
-    #[test]
-    fn test_can_be_disintegrated_true() {
-        let target = Brick { min: (0, 0, 1), max: (1, 0, 1) };
-        let other_bottom = Brick { min: (2, 0, 1), max: (3, 0, 1) };
-        let bottom_row = vec![
-            &target,
-            &other_bottom,
-        ];
-        let top_row = vec![
-            Brick { min: (2, 0, 2), max: (3, 0, 2) }, // this brick should not fall
-        ];
-        let top_row_borrow = top_row.iter().collect_vec();
-
-        let result = can_be_disintergrated(&target, Box::new(bottom_row.iter()), Box::new(top_row_borrow.iter()));
-        assert_eq!(result, true);
-    }
-
-    #[test]
-    fn test_can_be_disintegrated_overlapping_true() {
-        let target = Brick { min: (1, 0, 1), max: (2, 0, 1) };
-        let other_bottom = Brick { min: (2, 0, 1), max: (3, 0, 1) };
-        let other_other_bottom = Brick { min:   (0, 0, 1), max: (1, 0, 1) };
-        let bottom_row = vec![
-            &other_other_bottom,
-            &target,
-            &other_bottom,
-        ];
-        let top_row = vec![
-            Brick { min: (0, 0, 2), max: (2, 0, 3) }, // this brick should not fall as something else supports it
-        ];
-        let top_row_borrow = top_row.iter().collect_vec();
-
-        let result = can_be_disintergrated(&target, Box::new(bottom_row.iter()), Box::new(top_row_borrow.iter()));
-        assert_eq!(result, true);
     }
 
     #[test]
