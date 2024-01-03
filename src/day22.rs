@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use itertools::Itertools;
 use crate::common::load_from;
 
@@ -8,12 +8,13 @@ pub fn run_day() {
     let data = load_from("day22.txt");
     let gravity_bricks = prepare_bricks(data.as_str());
     println!("Part 1: {}", run_day22a(&gravity_bricks));
+    println!("Part 2: {}", run_day22b(&gravity_bricks));
 }
 
 fn prepare_bricks(data: &str) -> Vec<Brick> {
     let mut bricks = parse_bricks(&data);
     sort_bricks_in_z(&mut bricks);
-    apply_gravity(bricks)
+    apply_gravity(bricks).0
 }
 
 fn run_day22a(bricks: &Vec<Brick>) -> u32 {
@@ -45,6 +46,41 @@ fn run_day22a(bricks: &Vec<Brick>) -> u32 {
     }
 
     counter
+}
+
+fn run_day22b(bricks: &Vec<Brick>) -> u64 {
+    let mut changed = 0u64;
+    // let (min_z_slice, max_z_slice) = gather_slices(bricks);
+    for brick in bricks {
+        let vec = bricks.iter().filter_map(|x| {
+            if x == brick {
+                None
+            } else {
+                Some(x.clone())
+            }
+        }).collect_vec();
+        changed += apply_gravity(vec).1;
+    }
+    changed
+}
+
+// TODO: For later -- use dynamic programming for this.
+// fn run_day22b(bricks: &Vec<Brick>) {
+//     let map: HashMap<&Brick, HashSet<&Brick>> = HashMap::new();
+//     let (min_z_slice, max_z_slice) = gather_slices(bricks);
+//     for brick in bricks.iter().rev() {
+//         let affected = affected_by_disintegration();
+//     }
+// }
+
+fn affected_by_disintegration<'a>(target: &'a Brick, above: Vec<&'a Brick>) -> HashSet<&'a Brick> {
+    above.iter().filter_map(|b| {
+        if target.xy_overlap(*b) {
+            Some(*b)
+        } else {
+            None
+        }
+    }).collect()
 }
 
 #[allow(dead_code)]
@@ -103,9 +139,9 @@ fn sort_bricks_in_z(bricks: &mut Vec<Brick>) {
     bricks.sort_unstable_by_key(|Brick { min, max: _ }|  min.2)
 }
 
-fn apply_gravity(bricks: Vec<Brick>) -> Vec<Brick> {
+fn apply_gravity(bricks: Vec<Brick>) -> (Vec<Brick>, u64) {
     let mut result: Vec<Brick> = Vec::new();
-    let mut changed = false;
+    let mut changed = 0u64;
     for brick in bricks {
         if brick.min.2 == 1 {
             // do nothing if it sits on the bottom.
@@ -113,20 +149,18 @@ fn apply_gravity(bricks: Vec<Brick>) -> Vec<Brick> {
         } else {
             let old_z = brick.min.2;
             let new_z = result.iter_mut().filter_map(|x| brick.would_fall_above(x)).max().unwrap_or(1);
-            changed |= old_z != new_z;
+            if old_z != new_z {
+                changed += 1;
+            }
             result.push(brick.drop_to(new_z))
         }
     }
 
     sort_bricks_in_z(&mut result);
-    if changed {
-        apply_gravity(result)
-    } else {
-        result
-    }
+    (result, changed)
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone, Hash)]
 struct Brick {
     min: Coord,
     max: Coord
@@ -185,7 +219,7 @@ mod test {
     use proptest::proptest;
     use rstest::rstest;
     use structopt::lazy_static::lazy_static;
-    use crate::day22::{apply_gravity, Brick, can_be_disintergrated, Coord, gather_slices, parse_bricks, parse_coord, prepare_bricks, run_day22a};
+    use crate::day22::{apply_gravity, Brick, can_be_disintergrated, Coord, gather_slices, parse_bricks, parse_coord, prepare_bricks, run_day22a, run_day22b};
 
     const TEST_DATA: &str = indoc! {
         "1,0,1~1,2,1
@@ -256,7 +290,7 @@ mod test {
     #[test]
     fn test_apply_gravity() {
         let a = PARSED_DATA.deref().iter().map(|x| x.clone()).collect_vec();
-        assert_eq!(&apply_gravity(a), GRAVITY_APPLIED_DATA.deref());
+        assert_eq!(&apply_gravity(a).0, GRAVITY_APPLIED_DATA.deref());
     }
 
     #[test]
@@ -362,5 +396,11 @@ mod test {
             }
         }
     }
+
+    #[test]
+    fn test_day_22b() {
+        assert_eq!(run_day22b(GRAVITY_APPLIED_DATA.deref()), 7);
+    }
+
 
 }
